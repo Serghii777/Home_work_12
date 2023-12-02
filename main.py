@@ -108,7 +108,16 @@ class Record:
         return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
 
 class AddressBook(UserDict):
-  
+    
+    def search(self, search_string):
+        results = []
+        for record in self.data.values():
+            if (
+                search_string.lower() in record.name.value.lower()
+                or any(search_string in phone.value for phone in record.phones)
+            ):
+                results.append(record)
+        return results
 
     def add_record(self, record: Record):
         self.data[record.name.value] = record
@@ -132,21 +141,36 @@ class AddressBook(UserDict):
                 result = ''
     
     def dump(self):
-        with open(self.file_path, 'w') as file:
-            json.dump(self.data, file, indent=2)
+        with open(self.file, 'wb') as file:
+            json.dump((self.record_id, self.record), file)
 
     def load(self):
-        if not self.file_path.exists():
+        if not self.file.exists():
             return
-        with open(self.file_path, 'r') as file:
-            data = json.load(file)
-            for name, record_data in data.items():
-                record = Record(name, record_data.get("Birthday"))
-                for phone_number in record_data.get("phones", []):
-                    record.add_phone(phone_number)
-                self.add_record(record)
+        with open(self.file, 'rb') as file:
+            self.record_id, self.record = json.load(file)
+
 
 class Controller(cmd.Cmd):
-    def exit(self):
+    def __init__(self):
+        super().__init__()
+        self.prompt = "AddressBook> "
+        self.address_book = AddressBook("address_book.json")
+
+    def do_search(self, line):
+        search_string = input("Введіть рядок пошуку: ")
+        search_results = self.address_book.search(search_string.strip())
+        if search_results:
+            print("Результати пошуку:")
+            for result in search_results:
+                print(result)
+        else:
+            print("Контакти не знайдено.")
+
+    def do_quit(self, line):
         self.address_book.dump()
         return True
+
+if __name__ == "__main__":
+    controller = Controller()
+    controller.cmdloop()
